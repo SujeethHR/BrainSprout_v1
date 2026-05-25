@@ -1,0 +1,13 @@
+services:
+  brainsprout:
+    build: .
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    volumes:
+      - vector_db_data:/app/vector_db
+    restart: unless-stopped
+
+volumes:
+  vector_db_data:

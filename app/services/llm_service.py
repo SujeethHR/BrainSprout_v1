@@ -1,8 +1,11 @@
+import logging
 from langchain_groq import ChatGroq
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.messages import HumanMessage, AIMessage
 from langchain_core.output_parsers import StrOutputParser
 from config import Config
+
+logger = logging.getLogger(__name__)
 
 
 def _format_docs(docs):
@@ -48,5 +51,5 @@ class LLMService:
             ])
             return answer
         except Exception as e:
-            print(f"Error getting LLM response: {e}")
+            logger.error("llm_error", extra={"error": str(e)})
             return "I encountered an error processing your request."

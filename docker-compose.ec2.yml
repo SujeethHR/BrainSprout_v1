@@ -1,0 +1,9 @@
+services:
+  brainsprout:
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: ap-south-1
+        awslogs-group: /brainsprout/app
+        awslogs-stream: "{{.ID}}"
+        awslogs-create-group: "true"

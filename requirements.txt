@@ -13,3 +13,4 @@ chromadb>=0.5
 pypdf>=4.0
 tiktoken>=0.7
 unstructured>=0.15
+python-json-logger>=2.0

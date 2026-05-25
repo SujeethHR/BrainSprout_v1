@@ -153,6 +153,144 @@ Content-Type: application/json
 
 ---
 
+## Deployment
+
+### Docker (local)
+
+Make sure [Docker Desktop](https://www.docker.com/products/docker-desktop/) is installed, then run:
+
+```bash
+docker compose up --build
+```
+
+The app will be available at `http://localhost:8080`.
+
+To run in the background:
+
+```bash
+docker compose up --build -d
+```
+
+To stop:
+
+```bash
+docker compose down
+```
+
+The ChromaDB vector store is persisted in a Docker named volume (`vector_db_data`), so your uploaded documents survive container restarts.
+
+---
+
+### Deploy on AWS EC2
+
+**1. Launch an EC2 instance**
+- Go to AWS Console → EC2 → Launch Instance
+- Choose **Ubuntu 24.04 LTS** (recommended: `t3.small` or larger — the embedding model uses ~500MB RAM)
+- Set storage to **20 GB** or more
+- Open inbound ports **22** (SSH) and **8080** (app) in the Security Group
+
+**2. SSH into the instance**
+
+```bash
+ssh -i your-key.pem ubuntu@<EC2-PUBLIC-IP>
+```
+
+**3. Install Docker**
+
+```bash
+sudo apt update
+sudo apt install -y docker.io docker-compose-plugin
+sudo systemctl enable --now docker
+sudo usermod -aG docker ubuntu
+newgrp docker
+```
+
+**4. Clone the repo and create `.env`**
+
+```bash
+git clone https://github.com/SujeethHR/BrainSprout_v1.git
+cd BrainSprout_v1
+nano .env
+```
+
+Paste your credentials into the file (same format as the local `.env` described in the Setup section), then save.
+
+**5. Build and run with CloudWatch logging**
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.ec2.yml up --build -d
+```
+
+This merges `docker-compose.ec2.yml`, which routes all container logs to CloudWatch under the log group `/brainsprout/app`.
+
+**6. Access the app**
+
+```
+http://<EC2-PUBLIC-IP>:8080
+```
+
+> **Note:** ChromaDB data persists as a Docker volume on the EC2 disk. It survives `docker compose down` and restarts but is lost if you **terminate** (not stop) the instance.
+
+---
+
+## CI/CD
+
+Every push and pull request to `main` triggers a GitHub Actions workflow (`.github/workflows/ci.yml`) that:
+
+1. Builds the Docker image from scratch
+2. Starts the container with dummy credentials
+3. Waits for the Flask app to be ready on port 8080
+4. Runs a smoke test against the `/query` endpoint to confirm the app responds correctly
+5. Prints container logs (always, for debugging) and stops the container
+
+The embedding model (`sentence-transformers/all-MiniLM-L6-v2`) is baked into the Docker image at build time, so the container starts instantly without downloading anything at runtime.
+
+---
+
+## Observability
+
+The app emits structured JSON logs to stdout on every request and key event. Each log line is a valid JSON object:
+
+```json
+{"asctime": "2025-05-25 10:00:00", "name": "app.main", "levelname": "INFO", "message": "request", "method": "POST", "path": "/query", "status": 200, "duration_ms": 842.5}
+{"asctime": "2025-05-25 10:00:00", "name": "app.main", "levelname": "INFO", "message": "upload_completed", "filename": "notes.pdf", "chunks": 38}
+```
+
+**Key log events:**
+
+| Event | Fields |
+|---|---|
+| `request` | `method`, `path`, `status`, `duration_ms` |
+| `upload_started` | `filename` |
+| `upload_completed` | `filename`, `chunks` |
+| `upload_s3_failed` | `filename`, `error` |
+| `query_started` | `question_length` |
+| `query_completed` | `llm_duration_ms` |
+| `query_failed` | `error` |
+
+**CloudWatch (on EC2)**
+
+When running with `docker-compose.ec2.yml`, Docker ships all stdout logs to CloudWatch Logs automatically via the `awslogs` driver. No SDK or extra library is needed in the app. Logs appear in:
+
+- Log group: `/brainsprout/app`
+- Log stream: container ID (one stream per container instance)
+
+To view logs from the AWS Console: CloudWatch → Log groups → `/brainsprout/app`.
+
+To tail logs from the CLI:
+
+```bash
+aws logs tail /brainsprout/app --follow --region ap-south-1
+```
+
+To set up a CloudWatch alarm (e.g. alert on errors):
+
+1. Go to CloudWatch → Log groups → `/brainsprout/app`
+2. Create a **Metric Filter** with the pattern `{ $.levelname = "ERROR" }`
+3. Create an **Alarm** on that metric with an SNS notification to your email
+
+---
+
 ## Future scope
 
 The current version is a working foundation. Here are meaningful directions to take it next:
@@ -178,18 +316,17 @@ The current version is a working foundation. Here are meaningful directions to t
 - Add a confidence score so users know how well the retrieved context matched the question
 
 **Deployment**
-- Containerize the app with Docker for consistent deployment
-- Move ChromaDB from local storage to a hosted vector database (such as Pinecone or Weaviate) so the vector index persists across restarts
+- Move ChromaDB from local storage to a hosted vector database (such as Pinecone or Weaviate) so the vector index persists across instance termination
 - Add environment-based configuration for staging and production
-- Set up a CI/CD pipeline
+- Add automated deployment step to the CI/CD pipeline (build → push to ECR → deploy to EC2)
 
 **Model flexibility**
 - Allow users to choose between different LLMs (OpenAI, Anthropic, local Ollama models)
 - Add a settings page to adjust temperature and retrieval parameters without touching the code
 
 **Monitoring and observability**
-- Add structured logging to track queries, upload times, and errors
-- Integrate LangSmith or a similar tool to trace and debug LangChain chains
+- Add CloudWatch dashboards for request latency, error rate, and upload throughput
+- Integrate LangSmith to trace and debug LangChain chains
 - Track token usage and API costs over time
 
 ---
