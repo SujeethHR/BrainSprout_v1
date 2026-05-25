@@ -1,0 +1,41 @@
+[project]
+name = "brainsprout"
+version = "0.1.0"
+description = "A knowledge intelligence system powered by RAG and LLMs"
+readme = "README.md"
+requires-python = ">=3.13"
+license = { text = "MIT" }
+authors = [
+    { name = "Sujeeth HR", email = "sujithdx@gmail.com" },
+]
+keywords = ["rag", "ai", "knowledge-base", "flask", "langchain", "llm"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Framework :: Flask",
+]
+dependencies = [
+    "flask>=3.0",
+    "werkzeug>=3.0",
+    "langchain>=0.3",
+    "langchain-groq>=0.1",
+    "langchain-huggingface>=0.1",
+    "langchain-community>=0.3",
+    "langchain-chroma>=0.1",
+    "langchain-text-splitters>=0.3",
+    "sentence-transformers>=3.0",
+    "python-dotenv>=1.0",
+    "boto3>=1.34",
+    "chromadb>=0.5",
+    "pypdf>=4.0",
+    "tiktoken>=0.7",
+    "unstructured>=0.15",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
